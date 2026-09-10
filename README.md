@@ -12,7 +12,7 @@ the plugin places a regular grid of sample points across the area and computes:
 - **d1** — straight-line (skidding) distance from each sample point to the nearest forest road
 - **d2** — shortest network path along the road from the road snap point to the nearest landing
 
-Summary statistics (mean d1, mean d2) are reported in a table output.
+Summary statistics (mean d1, mean d2) are reported in an HTML result report.
 
 ## Requirements
 
@@ -35,37 +35,39 @@ Summary statistics (mean d1, mean d2) are reported in a table output.
 | Landing points | Vector point | — | One or more log landing locations |
 | Grid spacing (m) | Float | 4.0 | Spacing of the sample grid in metres |
 | Network snapping tolerance (m) | Float | 5.0 | Tolerance for snapping start points onto the road network |
+| Split roads at intersections | Boolean | True | Split road lines at intersections before routing for better connectivity |
 
 ## Outputs
 
-| Output | Type | Description |
-|--------|------|-------------|
-| p1 — grid points | Point layer | Regular grid clipped to the operation area polygon |
-| p2 — road snap points | Point layer | Points on the road with `d1` and `d2` attributes |
-| Routes | Line layer | Shortest network routes from each p2 to the nearest landing |
-| Summary | Table | `n_points`, `n_d2_null`, `d1_mean`, `d2_mean` |
+| Output | Description |
+|--------|-------------|
+| Result report (HTML) | Mean d1 and d2, sample point count, unreachable point count |
+
+Enable **Debug mode** (Advanced parameters) to also load intermediate layers into the project:
+`debug_p1_grid`, `debug_p2_road_snap`, `debug_routes`, `debug_summary`
 
 ## Sample Data
 
-The `sample_data/` directory contains a GeoPackage (`avg_extraction_sample.gpkg`) with:
+The `sample_data/` directory contains sample files in EPSG:6676 (JGD2011 Japan Plane Rectangular CS IX):
 
-- `operation_area` — harvest block polygon (EPSG:6676 / JGD2011 Japan Plane Rectangular CS IX)
-- `forest_roads` — connected road network; one road segment is intentionally disconnected to demonstrate NULL d2
-- `landings` — multiple landing points
+- `operation_area.geojson` — harvest block polygon
+- `forest_roads.geojson` — connected road network (one segment intentionally disconnected to demonstrate NULL d2)
+- `landings.geojson` — multiple landing points
+- `avg_extraction_sample.gpkg` — GeoPackage with all of the above
 
-Suggested parameters for the sample data: grid spacing = 4 m, snapping tolerance = 5 m.
+Suggested parameters: grid spacing = 4 m, snapping tolerance = 5 m.
 
 ## Notes
 
-- Points with `d2 = NULL` in the p2 output could not be routed to any landing. This typically
-  means the snap point lies on a disconnected road segment. Increase snapping tolerance or
-  check road network connectivity.
+- Points with `d2 = NULL` could not be routed to any landing. This typically means the snap
+  point lies on a disconnected road segment. Increase snapping tolerance or check road network
+  connectivity.
 - The algorithm iterates over all landing points and assigns each sample point the minimum d2,
   so multiple landings are handled correctly.
 
 ## License
 
-GPL-3.0 — see [LICENSE](../LICENSE)
+GPL-3.0 — see [LICENSE](LICENSE)
 
 ## Author
 

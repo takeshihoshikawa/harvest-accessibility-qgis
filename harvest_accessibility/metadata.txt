@@ -2,7 +2,7 @@
 name=Harvest Accessibility
 qgisMinimumVersion=3.22
 description=Compute harvest accessibility distances for forestry operations: d1 (straight line to nearest forest road) and d2 (shortest network path to nearest landing point).
-version=0.1.0
+version=0.1.1
 author=Takeshi Hoshikawa
 email=hoshikawa.takeshi@spua.ac.jp
 about=Given an operation area polygon, forest road network, and landing points, this plugin creates a regular grid of sample points, computes the straight-line distance from each to the nearest road (d1), then routes along the road network to the nearest landing (d2). Outputs: grid points (p1), road-snap points with distances (p2), route lines, and a summary table of mean distances. Requires a projected CRS in metres.

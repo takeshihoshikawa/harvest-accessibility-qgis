@@ -154,9 +154,17 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
             ).format(landing_crs.authid(), crs.authid()))
 
         try:
+            # Helper: register a memory layer in the context's temporary store so it can be
+            # referenced by ID in subsequent processing.run() calls.  Without this,
+            # passing QgsVectorLayer objects in parameter dicts requires PyQt6/SIP to convert
+            # them to QVariant, which fails intermittently in QGIS 4.0 (PyQt6).
+            def _reg(lyr):
+                context.temporaryLayerStore().addMapLayer(lyr)
+                return lyr
+
             # 1) Create grid points and clip to polygon
             feedback.pushInfo(self.tr("1) Creating grid points (p1)..."))
-            grid_layer = processing.run(
+            grid_layer = _reg(processing.run(
                 "native:creategrid",
                 {
                     "TYPE": 0,  # point
@@ -169,18 +177,18 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
-            p1 = processing.run(
+            p1 = _reg(processing.run(
                 "native:extractbylocation",
                 {
-                    "INPUT": grid_layer,
+                    "INPUT": grid_layer.id(),
                     "PREDICATE": [0],  # intersects
-                    "INTERSECT": self.parameterAsLayer(parameters, self.POLY, context),
+                    "INTERSECT": parameters[self.POLY],
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
             if p1.featureCount() == 0:
                 raise QgsProcessingException(self.tr(
@@ -188,10 +196,10 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     "Try a smaller grid spacing."
                 ))
 
-            p1 = processing.run(
+            p1 = _reg(processing.run(
                 "native:fieldcalculator",
                 {
-                    "INPUT": p1,
+                    "INPUT": p1.id(),
                     "FIELD_NAME": "tree_id",
                     "FIELD_TYPE": 1,  # int
                     "FIELD_LENGTH": 10,
@@ -200,26 +208,26 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
             # 2) Shortest line to roads -> d1, nearest point on road -> p2
             feedback.pushInfo(self.tr("2) Computing shortest lines to roads (d1) and nearest points (p2)..."))
-            shortest_lines = processing.run(
+            shortest_lines = _reg(processing.run(
                 "native:shortestline",
                 {
-                    "SOURCE": p1,
-                    "DESTINATION": self.parameterAsLayer(parameters, self.ROADS, context),
+                    "SOURCE": p1.id(),
+                    "DESTINATION": parameters[self.ROADS],
                     "METHOD": 0,
                     "NEIGHBORS": 1,
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
-            shortest_lines = processing.run(
+            shortest_lines = _reg(processing.run(
                 "native:fieldcalculator",
                 {
-                    "INPUT": shortest_lines,
+                    "INPUT": shortest_lines.id(),
                     "FIELD_NAME": "d1",
                     "FIELD_TYPE": 0,  # float
                     "FIELD_LENGTH": 20,
@@ -228,17 +236,17 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
-            p2 = processing.run(
+            p2 = _reg(processing.run(
                 "native:extractspecificvertices",
                 {
-                    "INPUT": shortest_lines,
+                    "INPUT": shortest_lines.id(),
                     "VERTICES": "-1",  # last vertex = nearest point on road
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
             # 3) Shortest path to nearest landing along road network
             # NOTE: QGIS 'native:shortestpathpointtolayer' expects a SINGLE START_POINT (coordinate),
@@ -250,21 +258,23 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
             if landing_layer.featureCount() == 0:
                 raise QgsProcessingException(self.tr("Landing layer has no features."))
 
-            roads_layer = self.parameterAsLayer(parameters, self.ROADS, context)
             if split_roads:
                 feedback.pushInfo(self.tr("3a) Splitting roads at intersections..."))
-                roads_layer = processing.run(
+                roads_layer = _reg(processing.run(
                     "native:splitwithlines",
                     {
-                        "INPUT": roads_layer,
-                        "LINES": roads_layer,
+                        "INPUT": parameters[self.ROADS],
+                        "LINES": parameters[self.ROADS],
                         "OUTPUT": "memory:"
                     },
                     context=context, feedback=feedback
-                )["OUTPUT"]
+                )["OUTPUT"])
                 feedback.pushInfo(self.tr("    -> {} segments after split.").format(roads_layer.featureCount()))
+                roads_source = roads_layer.id()
+            else:
+                roads_source = parameters[self.ROADS]
 
-            routes_list = []
+            routes_id_list = []
             authid = crs.authid()
 
             for lf in landing_layer.getFeatures():
@@ -279,8 +289,8 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                 out = processing.run(
                     "native:shortestpathlayertopoint",
                     {
-                        "INPUT": roads_layer,
-                        "START_POINTS": p2,
+                        "INPUT": roads_source,
+                        "START_POINTS": p2.id(),
                         "END_POINT": end_point,
                         "STRATEGY": 0,  # shortest distance
                         "DEFAULT_DIRECTION": 2,
@@ -291,11 +301,11 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     context=context, feedback=feedback
                 )
 
-                r = out["OUTPUT"]
-                r = processing.run(
+                r = _reg(out["OUTPUT"])
+                r = _reg(processing.run(
                     "native:fieldcalculator",
                     {
-                        "INPUT": r,
+                        "INPUT": r.id(),
                         "FIELD_NAME": "landing_fid",
                         "FIELD_TYPE": 1,  # int
                         "FIELD_LENGTH": 20,
@@ -304,30 +314,30 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                         "OUTPUT": "memory:"
                     },
                     context=context, feedback=feedback
-                )["OUTPUT"]
+                )["OUTPUT"])
 
-                routes_list.append(r)
+                routes_id_list.append(r.id())
 
-            if not routes_list:
+            if not routes_id_list:
                 raise QgsProcessingException(self.tr(
                     "No valid landing points were found (all geometries empty?)."
                 ))
 
-            merged_routes = processing.run(
+            merged_routes = _reg(processing.run(
                 "native:mergevectorlayers",
-                {"LAYERS": routes_list, "CRS": crs, "OUTPUT": "memory:"},
+                {"LAYERS": routes_id_list, "CRS": crs, "OUTPUT": "memory:"},
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
             cost_field = "cost" if merged_routes.fields().indexFromName("cost") != -1 else None
             if cost_field is None:
                 feedback.pushInfo(self.tr(
                     "Note: routing output has no 'cost' field; using geometry length for d2."
                 ))
-            routes = processing.run(
+            routes = _reg(processing.run(
                 "native:fieldcalculator",
                 {
-                    "INPUT": merged_routes,
+                    "INPUT": merged_routes.id(),
                     "FIELD_NAME": "d2",
                     "FIELD_TYPE": 0,
                     "FIELD_LENGTH": 20,
@@ -336,18 +346,18 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
             if routes.fields().indexFromName("tree_id") == -1:
                 raise QgsProcessingException(self.tr(
                     "Routing output has no 'tree_id' field. Ensure p2 has 'tree_id' attribute."
                 ))
 
-            routes = processing.run(
+            routes = _reg(processing.run(
                 "native:extractbyexpression",
-                {"INPUT": routes, "EXPRESSION": "\"d2\" IS NOT NULL", "OUTPUT": "memory:"},
+                {"INPUT": routes.id(), "EXPRESSION": "\"d2\" IS NOT NULL", "OUTPUT": "memory:"},
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
             if routes.featureCount() == 0:
                 raise QgsProcessingException(self.tr(
@@ -357,26 +367,26 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     "and the snapping tolerance is sufficient."
                 ))
 
-            stats = processing.run(
+            stats = _reg(processing.run(
                 "qgis:statisticsbycategories",
                 {
-                    "INPUT": routes,
+                    "INPUT": routes.id(),
                     "CATEGORIES_FIELD_NAME": ["tree_id"],
                     "VALUES_FIELD_NAME": "d2",
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
             if stats.fields().indexFromName("min") == -1:
                 raise QgsProcessingException(self.tr("Unexpected statistics output (no 'min' field)."))
 
-            p2_tmp = processing.run(
+            p2_tmp = _reg(processing.run(
                 "native:joinattributestable",
                 {
-                    "INPUT": p2,
+                    "INPUT": p2.id(),
                     "FIELD": "tree_id",
-                    "INPUT_2": stats,
+                    "INPUT_2": stats.id(),
                     "FIELD_2": "tree_id",
                     "FIELDS_TO_COPY": ["min"],
                     "METHOD": 1,
@@ -385,12 +395,12 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
-            p2_with = processing.run(
+            p2_with = _reg(processing.run(
                 "native:fieldcalculator",
                 {
-                    "INPUT": p2_tmp,
+                    "INPUT": p2_tmp.id(),
                     "FIELD_NAME": "d2",
                     "FIELD_TYPE": 0,
                     "FIELD_LENGTH": 20,
@@ -399,7 +409,7 @@ class HarvestAccessibilityAlg(QgsProcessingAlgorithm):
                     "OUTPUT": "memory:"
                 },
                 context=context, feedback=feedback
-            )["OUTPUT"]
+            )["OUTPUT"])
 
             # 4) Summary statistics
             feedback.pushInfo(self.tr("4) Computing summary statistics..."))
