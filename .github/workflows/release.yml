@@ -1,0 +1,37 @@
+name: Release
+
+# 公開ミラー側に配置されるワークフロー。作業リポから deploy key で push された
+# タグを受けて動く（GITHUB_TOKEN による push と違い、SSH 鍵の push は Actions を発火させる）。
+on:
+  push:
+    tags:
+      - 'v*'
+  # 空のリポジトリへの初回 push では、ワークフローが登録される前に push イベントが
+  # 処理されるため、タグが届いても発火しない（2026-09-10 に実測）。取りこぼしたときに
+  # 手で流せるようにしておく: gh workflow run Release --repo <mirror> --ref vX.Y.Z
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build zip
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ZIP_NAME="harvest_accessibility_v${VERSION}.zip"
+          zip -r "$ZIP_NAME" harvest_accessibility \
+            --exclude "*/__pycache__/*" \
+            --exclude "*/.DS_Store"
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_NAME }}
+          body_path: CHANGELOG.md
