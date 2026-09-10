@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# QGIS
+*.qgz
+*.qgs
+
+# ZIP releases
+*.zip
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
