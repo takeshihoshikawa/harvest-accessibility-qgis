@@ -1,14 +1,14 @@
 [general]
 name=Harvest Accessibility
 qgisMinimumVersion=3.22
-description=Compute harvest accessibility distances for forestry operations: d1 (straight line to nearest forest road) and d2 (shortest network path to nearest landing point).
-version=0.1.1
+description=How far the wood has to be moved, and to which landing: the distance from each tree to the forest road, and along the road to the landing that serves it.
+version=0.2.0
 author=Takeshi Hoshikawa
 email=hoshikawa.takeshi@spua.ac.jp
-about=Given an operation area polygon, forest road network, and landing points, this plugin creates a regular grid of sample points, computes the straight-line distance from each to the nearest road (d1), then routes along the road network to the nearest landing (d2). Outputs: grid points (p1), road-snap points with distances (p2), route lines, and a summary table of mean distances. Requires a projected CRS in metres.
-tracker=https://github.com/takeshihoshikawa/harvest-accessibility/issues
-repository=https://github.com/takeshihoshikawa/harvest-accessibility
-homepage=https://github.com/takeshihoshikawa/harvest-accessibility
+about=Given an operation area polygon, forest road lines and landing points, this plugin measures how far the wood has to travel: d1 from each tree to the road, and d2 along the road network to the landing that serves it. Sample points come from individual tree points where they exist, otherwise from a lattice. Supply a DEM -- or let the plugin fetch one -- and d1 becomes the distance from the road to the near end of the felled stem rather than to the standing tree, with felling direction limited by slope, by barriers such as rivers, and optionally by the block boundary. Outputs an HTML report plus per-tree layers: sample points with distances, hauling lines, and felled stems. Requires a projected CRS in metres.
+tracker=https://github.com/takeshihoshikawa/harvest-accessibility-qgis/issues
+repository=https://github.com/takeshihoshikawa/harvest-accessibility-qgis
+homepage=https://github.com/takeshihoshikawa/harvest-accessibility-qgis
 tags=forestry,extraction distance,network analysis,processing,road network,skidding,hauling
 icon=icon.png
 hasProcessingProvider=yes

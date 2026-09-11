@@ -2,6 +2,7 @@ import os
 from qgis.core import QgsProcessingProvider
 from qgis.PyQt.QtGui import QIcon
 from .harvest_accessibility_alg import HarvestAccessibilityAlg
+from .fetch_dem_alg import FetchDemAlg
 
 
 class HarvestAccessibilityProvider(QgsProcessingProvider):
@@ -20,3 +21,4 @@ class HarvestAccessibilityProvider(QgsProcessingProvider):
 
     def loadAlgorithms(self):
         self.addAlgorithm(HarvestAccessibilityAlg())
+        self.addAlgorithm(FetchDemAlg())

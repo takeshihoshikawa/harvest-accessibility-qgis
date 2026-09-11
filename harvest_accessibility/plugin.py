@@ -36,9 +36,19 @@ class HarvestAccessibilityPlugin:
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
+    def initProcessing(self):
+        """Register the Processing provider.
+
+        Called by initGui() in the desktop app, and directly by QGIS when the
+        plugin is loaded without a GUI (qgis_process).  Keeping registration out
+        of initGui() is what lets the algorithm run headless.
+        """
+        if self.provider is None:
+            self.provider = HarvestAccessibilityProvider()
+            QgsApplication.processingRegistry().addProvider(self.provider)
+
     def initGui(self):
-        self.provider = HarvestAccessibilityProvider()
-        QgsApplication.processingRegistry().addProvider(self.provider)
+        self.initProcessing()
 
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         icon = QIcon(icon_path) if os.path.exists(icon_path) \
@@ -51,8 +61,9 @@ class HarvestAccessibilityPlugin:
         self.iface.addToolBarIcon(self.action)
 
     def unload(self):
-        self.iface.removePluginMenu(tr("Harvest Accessibility"), self.action)
-        self.iface.removeToolBarIcon(self.action)
+        if self.iface is not None and self.action is not None:
+            self.iface.removePluginMenu(tr("Harvest Accessibility"), self.action)
+            self.iface.removeToolBarIcon(self.action)
         if self.provider is not None:
             QgsApplication.processingRegistry().removeProvider(self.provider)
             self.provider = None

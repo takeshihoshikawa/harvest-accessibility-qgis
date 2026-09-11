@@ -21,6 +21,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # metadata.txt の version は QGIS のプラグイン管理が更新判定に使う値で、
+      # zip のファイル名とは独立している。ずれたまま公開すると更新が検知されず、
+      # plugins.qgis.org も受け付けない。
+      - name: Check declared version matches tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DECLARED="$(sed -n 's/^version=//p' harvest_accessibility/metadata.txt)"
+          if [ "$DECLARED" != "$VERSION" ]; then
+            echo "metadata.txt の version=$DECLARED がタグ $GITHUB_REF_NAME と一致しない" >&2
+            exit 1
+          fi
+
       - name: Build zip
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
