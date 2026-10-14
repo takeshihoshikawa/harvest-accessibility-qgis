@@ -14,6 +14,7 @@ from qgis.core import (
     QgsProcessingAlgorithm,
     QgsProcessingParameterFeatureSource,
     QgsProcessingParameterEnum,
+    QgsProcessingParameterCrs,
     QgsProcessingParameterNumber,
     QgsProcessingParameterDefinition,
     QgsProcessingParameterRasterDestination,
@@ -24,6 +25,7 @@ from qgis.core import (
     QgsCoordinateTransform,
     QgsProject,
     QgsRectangle,
+    QgsUnitTypes,
 )
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis import processing
@@ -37,6 +39,7 @@ class FetchDemAlg(QgsProcessingAlgorithm):
     ZOOM = "ZOOM"
     MARGIN = "MARGIN"
     RESOLUTION = "RESOLUTION"
+    TARGET_CRS = "TARGET_CRS"
     OUTPUT = "OUTPUT"
 
     def tr(self, string):
@@ -52,7 +55,7 @@ class FetchDemAlg(QgsProcessingAlgorithm):
         return self.tr("Harvest Accessibility")
 
     def groupId(self):
-        return "harvestaccessibility"
+        return "harvest_accessibility"
 
     def createInstance(self):
         return FetchDemAlg()
@@ -60,7 +63,10 @@ class FetchDemAlg(QgsProcessingAlgorithm):
     def shortHelpString(self):
         return self.tr(
             "Downloads published elevation tiles covering an operation area and "
-            "writes a DEM in the layer's own CRS.\n\n"
+            "writes a DEM in the layer's own CRS, or in the CRS you choose. An "
+            "area drawn in degrees needs one chosen -- the CRS of the survey "
+            "data, for instance -- because the margin and the resolution are "
+            "in metres.\n\n"
             "The main algorithm can fetch its own DEM, so use this when you want "
             "the file itself: to reuse one DEM across runs, to inspect or edit "
             "it, or to prepare one for a machine without network access.\n\n"
@@ -88,6 +94,14 @@ class FetchDemAlg(QgsProcessingAlgorithm):
             self.tr("Output resolution (m; 0 = the tile's own resolution)"),
             QgsProcessingParameterNumber.Double,
             defaultValue=0.0, minValue=0.0
+        ))
+        # Only needed when the area is not already in metres.  Chosen by the
+        # user rather than guessed: a UTM zone worked out from the centroid
+        # would give a DEM in a CRS nobody asked for.
+        self.addParameter(QgsProcessingParameterCrs(
+            self.TARGET_CRS,
+            self.tr("DEM CRS (empty = the operation area's own)"),
+            optional=True
         ))
         margin = QgsProcessingParameterNumber(
             self.MARGIN,
@@ -121,23 +135,32 @@ class FetchDemAlg(QgsProcessingAlgorithm):
         out_path = self.parameterAsOutputLayer(parameters, self.OUTPUT, context)
 
         src_crs = source.sourceCrs()
-        if src_crs.isGeographic():
+        dem_crs = self.parameterAsCrs(parameters, self.TARGET_CRS, context)
+        if not dem_crs.isValid():
+            dem_crs = src_crs
+        if dem_crs.isGeographic() or dem_crs.mapUnits() != QgsUnitTypes.DistanceMeters:
             raise QgsProcessingException(self.tr(
-                "The extent layer is in a geographic CRS. Use a projected CRS in "
-                "metres so that the margin and output resolution mean metres."
-            ))
+                "The DEM would be written in {crs}, which is not a projected CRS "
+                "in metres, so the margin and the resolution would not mean "
+                "metres. Set 'DEM CRS' to one that is -- the CRS of the survey "
+                "data or of the forest roads, for instance."
+            ).format(crs=dem_crs.authid()))
 
+        # The margin is added in the DEM's CRS, where it is metres.
         ext = source.sourceExtent()
+        if dem_crs != src_crs:
+            ext = QgsCoordinateTransform(src_crs, dem_crs, QgsProject.instance()) \
+                .transformBoundingBox(ext)
         ext = QgsRectangle(ext.xMinimum() - margin, ext.yMinimum() - margin,
                            ext.xMaximum() + margin, ext.yMaximum() + margin)
         wgs = QgsCoordinateReferenceSystem("EPSG:4326")
-        ll = QgsCoordinateTransform(src_crs, wgs, QgsProject.instance()) \
+        ll = QgsCoordinateTransform(dem_crs, wgs, QgsProject.instance()) \
             .transformBoundingBox(ext)
 
         try:
             path = tiles.build_dem(
                 (ll.xMinimum(), ll.yMinimum(), ll.xMaximum(), ll.yMaximum()),
-                idx, zoom, src_crs.toWkt(), src_crs.authid(),
+                idx, zoom, dem_crs.toWkt(), dem_crs.authid(),
                 resolution=res, out_path=out_path, use_cache=False,
                 log=feedback.pushInfo,
                 progress=feedback.setProgress,

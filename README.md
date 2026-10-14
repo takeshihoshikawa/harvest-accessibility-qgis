@@ -27,7 +27,11 @@ Two optional inputs change what is measured:
 ## Requirements
 
 - QGIS 3.22 or later
-- Input layers must use a **projected CRS in metres** (e.g. EPSG:6676 for Japan)
+- At least one input layer must be in a **projected CRS in metres** (e.g. EPSG:6676 for Japan).
+  Distances are measured in the CRS of the first such layer, looking at the operation area, then
+  the forest roads, the landings, the tree points and the barriers. The rest are reprojected into
+  it, with a warning. No CRS is ever made up: an area drawn in WGS84 over a web map is measured in
+  the CRS of the survey data it is given with
 
 ## Installation
 
@@ -40,16 +44,16 @@ Two optional inputs change what is measured:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| Operation area (polygon) | Vector polygon | — | Harvest block boundary. Its CRS is the one everything else is brought into |
+| Operation area (polygon) | Vector polygon | — | Harvest block boundary. Any CRS; see [Requirements](#requirements) |
 | Forest roads (lines; also the haul network) | Vector line | — | The same layer serves both the distance to the road (d1) and the route to the landing (d2) |
 | Landings (points; more than one is fine) | Vector point | — | A landing away from the road is routed from the nearest point on it |
 | Barriers (rivers, cliffs; lines or polygons) | Vector line/polygon | — | Optional. Neither a felled stem nor a haul may cross one |
 | Keep felling and hauling inside the operation area | Boolean | off | Treats everything outside the block as a barrier. Strict: a road outside the boundary cannot be used either |
-| Individual trees (points; measured tree by tree) | Vector point | — | Optional. Real stem positions are used in place of the lattice |
+| Maximum yarding distance (slope distance, m; 0 = no limit) | Float | 0 | How far the machine can pull, along the ground. Trees beyond it are counted apart. See [Yarding range and volume](#yarding-range-and-volume) |
+| Individual trees (points; measured tree by tree) | Vector point | — | Optional. Real stem positions are used in place of the lattice. A large published layer can be given as it is: only the points in the operation area are used, and only those near it are reprojected if its CRS differs |
 | Tree height (field of the tree layer) | Field | — | Optional. Falls back to the value below |
 | Tree height (m, when no field is given) | Float | 20.0 | Applied to every tree |
-
-Inputs in a different CRS to the operation area are reprojected, with a warning.
+| Volume (field of the tree layer, m3 per tree) | Field | — | Optional. Totalled per landing in the report |
 
 Advanced parameters:
 
@@ -63,16 +67,15 @@ Advanced parameters:
 | Slope allowing any direction (deg) | Float | 10.0 | At or below this slope the tree can be felled any way |
 | Direct grapple reach (m) | Float | 3.0 | Within this distance of the road nothing is winched |
 | Slope/aspect smoothing window (m) | Float | 5.0 | Cell size the DEM is resampled to before slope and aspect |
-| Candidate roads per sample point | Integer | 10 | How many nearby roads are considered |
-| Maximum sample points | Integer | 200000 | Stops before processing rather than running out of memory part way. Memory is roughly 0.42 GB plus 13 KB per sample point. 0 disables the check |
+| Maximum sample points | Integer | 250000 | Stops before processing rather than running out of memory part way. Memory is roughly 0.39 GB plus 11.5 KB per sample point with the felling model on, 8.7 KB without; 250,000 points is about 3.3 GB. 0 disables the check |
 | Split roads at intersections | Boolean | True | Split road lines at intersections before routing |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| Result report (HTML) | Mean d1 and d2, sample point count, unreachable point count |
-| Sample points with distances | One point per tree or grid node: `d1`, `d2`, `d_total`, the landing it feeds, and — with the felling model — the felling azimuth and stem reach |
+| Result report (HTML) | Mean d1 and d2, sample point count, unreachable point count, and a table per landing: trees, volume, mean d1 and d2 |
+| Sample points with distances | One point per tree or grid node: `d1`, `d2`, `d_total`, the landing it feeds, `in_range`, `volume` (when a volume field is given), and — with the felling model — `d1_slope`, the felling azimuth and stem reach |
 | Hauling lines | From the end that gets grabbed to the point on the road. Only where something is actually winched |
 | Felled stems | Butt to top, as felled. Needs the felling model |
 
@@ -82,9 +85,6 @@ of the points at zero folding them into the ramp flattens everything else.
 
 On a grid the stems are hypothetical trees at each node, and at 4 m spacing 20 m stems overlap
 into a solid mass. They are meant for real tree points.
-
-Enable **Debug mode** (Advanced parameters) to also load intermediate layers into the project:
-`debug_p1_grid`, `debug_p2_road_snap`, `debug_routes`, `debug_summary`
 
 ## Felling model
 
@@ -108,6 +108,31 @@ next to the assumptions that produced them.
 Direction choice clamps the bearing to the road into the allowed sector. That is exact for a
 straight road and an approximation for a curved or branching network.
 
+`d1_slope` is d1 measured along the ground: the winch line runs straight between the grabbed end
+and the road, so it is `√(d1² + Δz²)` with Δz the height difference of those two points, taken
+from the DEM at its own resolution.
+
+## Yarding range and volume
+
+**Maximum yarding distance** is the reach of the machine — the length of a winch line or a
+swing yarder — as a slope distance. A tree whose `d1_slope` exceeds it is *out of range*:
+`in_range` is 0, and it is left out of the means and of the landing rows, and shown in a row of
+its own with its count and volume. 0 (the default) keeps every tree in range, which gives the
+same answer as 0.2.0.
+
+Without a DEM there is no slope distance, and the limit is applied to the horizontal d1. That is
+shorter, so trees near the limit can be counted in range when they are not; the run says so.
+
+The felling direction is still chosen on the horizontal d1, and the slope distance taken for
+that choice. A tree that some other direction would bring under the limit is reported out of
+range.
+
+**Volume** is read per tree from a field of the tree layer. Which volume equation suits the
+stand is a forestry decision, so it is made outside and the result supplied. The report totals
+it per landing, with the trees that reach no landing under their own headings — out of range,
+unreachable along the network, cannot be extracted — so the rows add up to the block. Every
+sample point is treated as felled: for a thinning, supply only the trees to be removed.
+
 ## Getting a DEM
 
 The main algorithm fetches elevation itself by default: **DEM download** is set to *Auto*, which
@@ -126,6 +151,10 @@ parameters does not download the same tiles again.
 DEM to a file. Use it when the file itself is what you want: to reuse one DEM across runs or
 projects, to inspect or edit it, or to prepare one for a machine with no network access.
 
+It writes the DEM in the operation area's CRS. If the area is in degrees, set **DEM CRS** to a
+projected CRS in metres — the CRS of the survey data, for instance — because the margin and the
+resolution are in metres. Nothing is guessed: without a metric CRS the tool stops and says so.
+
 Either way the DEM is reprojected out of web mercator first. This is not cosmetic — slope
 computed on mercator pixels comes out roughly 20% too gentle at Japanese latitudes, and the
 felling model branches on a slope threshold.
@@ -141,21 +170,28 @@ results.
 
 ## Sample Data
 
-The `data/sample/` directory contains sample files in EPSG:6676 (JGD2011 Japan Plane Rectangular CS VIII):
+The `data/sample/` directory contains synthetic sample data in EPSG:6676 (JGD2011 Japan Plane
+Rectangular CS VIII), as GeoJSON files and as one GeoPackage with the same three layers:
 
-- `operation_area.geojson` — harvest block polygon
-- `forest_roads.geojson` — connected road network (one segment intentionally disconnected to demonstrate NULL d2)
-- `landings.geojson` — multiple landing points
-- `avg_extraction_sample.gpkg` — GeoPackage with all of the above
+- `operation_area.geojson` — a 400 m × 300 m harvest block
+- `forest_roads.geojson` — six roads forming one connected network
+- `landings.geojson` — three landings, A, B and C, each off the road: A and B by 10 m, C by 60 m.
+  Each is reached from the nearest point on the road; C shows how far that can be
+- `avg_extraction_sample.gpkg` — the same three layers
 
-The defaults suit it: tree spacing 10 m, gap bridged 2 m. The third landing is deliberately off the network, so some points come back with `d2 = NULL`.
+The defaults suit it: tree spacing 10 m, gap bridged 2 m. Every point reaches a landing, so `d2`
+is never empty here.
 
 ## Notes
 
-- Points with `d2 = NULL` could not be routed to any landing, which usually means a break in the
-  road network. The gap tolerance is not a threshold — the count of unroutable points moves around
-  with it, because it decides how a point ties into the routing graph — so the run retries at a few
-  nearby values on its own and reports the one it used. If points remain, check the network itself.
+- Points with `d2 = NULL` could not be routed to any landing, which means a break in the road
+  network wider than the gap tolerance, or a road that does not connect to any landing.
+- d2 is the shortest distance along the network, searched once per landing. A tree's d2 depends
+  on that tree alone: up to 0.2.0 QGIS's routing tied all the points into the network together,
+  so neighbouring trees could share a d2 and the answer moved with the set of points.
+- The gap tolerance joins lines whose ends do not quite meet: a vertex within it of a vertex of
+  another line is joined to it. Vertices of the same line are never joined, so a densely surveyed
+  line keeps its full length.
 - Points with `d1 = NULL` cannot be extracted at all: no felling direction leaves a stem that can be
   pulled to a road it can reach. They are left out of both means and counted in the report.
 - The algorithm iterates over all landing points and assigns each sample point the minimum d2,

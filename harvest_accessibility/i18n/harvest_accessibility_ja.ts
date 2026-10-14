@@ -59,14 +59,6 @@
         <translation>作業道レイヤにフィーチャがありません。</translation>
     </message>
     <message>
-        <source>Polygon CRS is geographic (degrees). Reproject to a projected CRS in metres.</source>
-        <translation>ポリゴンのCRSが地理座標系（度）です。メートル系の投影座標系に再投影してください。</translation>
-    </message>
-    <message>
-        <source>Polygon CRS unit is &apos;{}&apos;, not metres. Grid spacing and distances will be incorrect. Reproject to a metric CRS.</source>
-        <translation>ポリゴンのCRS単位が「{}」です（メートルではありません）。グリッド間隔と距離が正しく計算されません。メートル系CRSに再投影してください。</translation>
-    </message>
-    <message>
         <source>1) Creating grid points (p1)...</source>
         <translation>1) グリッド点（p1）を作成中...</translation>
     </message>
@@ -97,14 +89,6 @@
     <message>
         <source>No valid landing points were found (all geometries empty?).</source>
         <translation>有効な土場点が見つかりませんでした（ジオメトリがすべて空です）。</translation>
-    </message>
-    <message>
-        <source>Note: routing output has no &apos;cost&apos; field; using geometry length for d2.</source>
-        <translation>注意：ルーティング出力に「cost」フィールドがないため、ジオメトリ長をd2として使用します。</translation>
-    </message>
-    <message>
-        <source>Routing output has no &apos;tree_id&apos; field. Ensure p2 has &apos;tree_id&apos; attribute.</source>
-        <translation>ルーティング出力に「tree_id」フィールドがありません。p2に「tree_id」属性があることを確認してください。</translation>
     </message>
     <message>
         <source>All grid points are unreachable from all landings. Check that the road network is connected, landing points are on or near the road, and the snapping tolerance is sufficient.</source>
@@ -167,10 +151,6 @@
         <translation>作業区域ポリゴンの中にサンプル点がありません。グリッドの場合は間隔を小さくしてください。単木ポイントの場合は作業区域と重なっているか確認してください。</translation>
     </message>
     <message>
-        <source>Number of candidate roads per sample point</source>
-        <translation>サンプル点ごとの候補作業道数</translation>
-    </message>
-    <message>
         <source>Sample points with distances</source>
         <translation>距離つきサンプル点</translation>
     </message>
@@ -187,8 +167,8 @@
         <translation>ダウンロードした DEM を開けませんでした: {}</translation>
     </message>
     <message>
-        <source>{} sample points were equidistant from more than one road; keeping one shortest line each.</source>
-        <translation>{} 点のサンプル点が複数の作業道から等距離でした。それぞれ最短線を1本だけ残します。</translation>
+        <source>{} sample points are equidistant from more than one road; each is routed from all of them and the shorter haul is kept.</source>
+        <translation>{} 点のサンプル点が複数の作業道から等距離です。どの作業道からも土場までの経路を求め、短い方を採ります。</translation>
     </message>
     <message>
         <source>Auto (try each source, best first)</source>
@@ -243,14 +223,6 @@
         <translation>土場点</translation>
     </message>
     <message>
-        <source>{layer} is in {src} but the operation area is in {dst}; it is being reprojected. Check that this is intended.</source>
-        <translation>{layer} の座標系が {src}、作業区域が {dst} です。変換して使いますが、意図した組み合わせか確認してください。</translation>
-    </message>
-    <message>
-        <source>    {n} points could not be routed at {tol} m; retrying at {retry} m.</source>
-        <translation>    {tol} m では {n} 点が経路を引けませんでした。{retry} m で試し直します。</translation>
-    </message>
-    <message>
         <source>Gap bridged in the road network (m)</source>
         <translation>路網の途切れを繋ぐ許容 (m)</translation>
     </message>
@@ -261,10 +233,6 @@
     <message>
         <source>A lattice at {sp} m over this extent would be about {n} points, past the limit of {lim}. Use a wider tree spacing, split the operation area into parts, or raise 'Maximum sample points' in the advanced parameters.</source>
         <translation>この範囲に {sp} m 間隔で格子を作ると約 {n} 点になり、上限の {lim} 点を超えます。立木間距離を広げるか、作業区域を分割するか、詳細パラメータの「サンプル点数の上限」を引き上げてください。</translation>
-    </message>
-    <message>
-        <source>Gap tolerance {tol} m left points unrouted, so every d2 below comes from {used} m instead. The tolerance decides which part of the network each point ties into, so the other distances moved too -- set it to {used} to reproduce this run.</source>
-        <translation>許容 {tol} m では経路を引けない点が残ったため、以下の d2 はすべて {used} m での値です。この値は各点が路網のどこに結びつくかを決めるので、他の距離も変わっています。同じ結果を再現するには {used} を指定してください。</translation>
     </message>
     <message>
         <source>Operation area (polygon)</source>
@@ -310,6 +278,58 @@ DEM は自動で取得します。木を斜面の倒せる方向へ倒したう�
 
 障害物や、作業区域の外へ伐倒・集材してよいかを設定すると、より現実に近い計算になります。</translation>
     </message>
+    <message>
+        <source>Maximum yarding distance (slope distance, m; 0 = no limit)</source>
+        <translation>集材範囲の上限（斜距離 m、0 で上限なし）</translation>
+    </message>
+    <message>
+        <source>Volume (field of the tree layer, m3 per tree)</source>
+        <translation>材積（単木レイヤのフィールド、m³/本）</translation>
+    </message>
+    <message>
+        <source>None of the input layers is in a projected CRS in metres, so distances cannot be measured. Reproject one of them -- the operation area or the forest roads -- to a metric CRS such as the plane rectangular system for the site.</source>
+        <translation>入力レイヤのどれもメートル単位の投影座標系ではないため、距離を測れません。作業区域か作業道のどちらかを、現場の平面直角座標系などメートル単位の座標系に再投影してください。</translation>
+    </message>
+    <message>
+        <source>The operation area is in {src}, which is not a projected CRS in metres, so distances are measured in {dst}, the CRS of {layer}.</source>
+        <translation>作業区域の座標系 {src} はメートル単位の投影座標系ではないため、{layer}の座標系 {dst} で距離を測ります。</translation>
+    </message>
+    <message>
+        <source>Operation area</source>
+        <translation>作業区域</translation>
+    </message>
+    <message>
+        <source>the operation area</source>
+        <translation>作業区域</translation>
+    </message>
+    <message>
+        <source>the forest roads</source>
+        <translation>作業道</translation>
+    </message>
+    <message>
+        <source>the landings</source>
+        <translation>土場</translation>
+    </message>
+    <message>
+        <source>the individual trees</source>
+        <translation>単木ポイント</translation>
+    </message>
+    <message>
+        <source>the barriers</source>
+        <translation>障害物</translation>
+    </message>
+    <message>
+        <source>{layer} is in {src}; it is being reprojected to {dst}, the CRS the distances are measured in. Check that this is intended.</source>
+        <translation>{layer} の座標系は {src} です。距離を測る座標系 {dst} に変換して使います。意図した組み合わせか確認してください。</translation>
+    </message>
+    <message>
+        <source>{n} trees have no slope distance (no DEM there), so the yarding limit was applied to their horizontal distance. That is shorter than the slope distance, so some of them may be counted in range when they are not.</source>
+        <translation>{n} 本は斜距離が出せない（その位置に DEM が無い）ため、水平距離で集材範囲を判定しました。水平距離は斜距離より短いので、範囲外の木を範囲内に数えていることがあります。</translation>
+    </message>
+    <message>
+        <source>{layer} is in {src}; the {n} points near the operation area are being reprojected to {dst}, the CRS the distances are measured in. Check that this is intended.</source>
+        <translation>{layer} の座標系は {src} です。作業区域の近くの {n} 点だけを、距離を測る座標系 {dst} に変換して使います。意図した組み合わせか確認してください。</translation>
+    </message>
 </context>
 <context>
     <name>FetchDemAlg</name>
@@ -318,14 +338,14 @@ DEM は自動で取得します。木を斜面の倒せる方向へ倒したう�
         <translation>DEM</translation>
     </message>
     <message>
-        <source>Downloads published elevation tiles covering an operation area and writes a DEM in the layer's own CRS.
+        <source>Downloads published elevation tiles covering an operation area and writes a DEM in the layer's own CRS, or in the CRS you choose. An area drawn in degrees needs one chosen -- the CRS of the survey data, for instance -- because the margin and the resolution are in metres.
 
 The main algorithm can fetch its own DEM, so use this when you want the file itself: to reuse one DEM across runs, to inspect or edit it, or to prepare one for a machine without network access.
 
 The DEM is reprojected out of web mercator before being written. That is not cosmetic -- slope computed on mercator tiles comes out roughly 20% too gentle at these latitudes.
 
 Sources: 静岡県 VIRTUAL SHIZUOKA / 産業技術総合研究所 シームレス標高タイル (CC BY 4.0). Credit the source when you publish results.</source>
-        <translation>作業区域を覆う公開標高タイルをダウンロードし、レイヤ自身の座標系で DEM を書き出します。
+        <translation>作業区域を覆う公開標高タイルをダウンロードし、レイヤ自身の座標系か、指定した座標系で DEM を書き出します。余白と解像度はメートル単位なので、度で描いた作業区域では座標系の指定が要ります（測量データの座標系など）。
 
 主アルゴリズムも自分で DEM を取得できるので、これはファイルそのものが欲しいときに使います。1つの DEM を複数回の実行で使い回す、中身を確認・編集する、ネットワークの無い機械のために用意する、といった場合です。
 
@@ -358,8 +378,12 @@ Sources: 静岡県 VIRTUAL SHIZUOKA / 産業技術総合研究所 シームレ�
         <translation>出力解像度 (m。0 でタイル本来の解像度)</translation>
     </message>
     <message>
-        <source>The extent layer is in a geographic CRS. Use a projected CRS in metres so that the margin and output resolution mean metres.</source>
-        <translation>範囲レイヤが地理座標系です。余白と出力解像度がメートルとして意味を持つよう、メートル単位の投影座標系を使ってください。</translation>
+        <source>The DEM would be written in {crs}, which is not a projected CRS in metres, so the margin and the resolution would not mean metres. Set &apos;DEM CRS&apos; to one that is -- the CRS of the survey data or of the forest roads, for instance.</source>
+        <translation>DEM の書き出し先の座標系 {crs} はメートル単位の投影座標系ではないため、余白と解像度がメートルになりません。「DEM の座標系」に、測量データや作業道の座標系など、メートル単位の座標系を指定してください。</translation>
+    </message>
+    <message>
+        <source>DEM CRS (empty = the operation area&apos;s own)</source>
+        <translation>DEM の座標系（空なら作業区域の座標系）</translation>
     </message>
     <message>
         <source>Tile source</source>
